@@ -1,19 +1,25 @@
 const express = require('express');
 const cors = require('cors');
 const { MongoClient } = require('mongodb');
-const res = require('express/lib/response');
 const ObjectId = require('mongodb').ObjectId;
 require('dotenv').config()
 
+// Twilio Package Initialized
+const twilio = require('twilio')(process.env.SID, process.env.AUTH_TOKEN)
+
+// Port Assigned
 const port = process.env.PORT || 5000;
 
+// Middleware
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Mongo DB Uri
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.be9iv.mongodb.net/${process.env.DB}?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
 
+// main function
 async function run() {
     try {
         await client.connect();
@@ -72,23 +78,19 @@ async function run() {
 
             res.json(result);
         })
+
+        // ----------------- Register New Candidate ------------
+        app.post('/registerCandidate', async (req, res) => {
+            const newCandidate = req.body;
+            const result = await candidatesCollection.insertOne(newCandidate)
+            res.json(result)
+        })
+
         // ------------- Delete Single Candidate -------------
         app.get('/candidate', async (req, res) => {
             const { deleteId } = req.query;
             const query = { _id: ObjectId(deleteId) };
             const result = await candidatesCollection.deleteOne(query);
-            res.json(result)
-        })
-
-        // ----------------- Reset Voters Status --------------
-        app.get('/resetVoters', async (req, res) => {
-            const filter = { voted: true };
-            const updateDoc = {
-                $set: { voted: false }
-            }
-            const options = { upsert: true }
-            const result = await votersCollection.updateMany(filter, updateDoc, options);
-
             res.json(result)
         })
 
@@ -120,7 +122,6 @@ async function run() {
         })
 
         //------------------- Login Process -----------------
-
         app.get('/login', async (req, res) => {
             const requestedNid = Number(req.query.nid);
             const query = { nidNumber: requestedNid }
@@ -132,6 +133,14 @@ async function run() {
                             res.json({ result, admin: false })
                         }
                          */
+            res.json(result)
+        })
+
+        // ------------------ Voter Query by nidNumber ----------
+        app.get('/voter', async (req, res) => {
+            const { nidNumber } = req.query;
+            const query = { nidNumber: Number(nidNumber) };
+            const result = await votersCollection.findOne(query)
             res.json(result)
         })
 
@@ -148,18 +157,15 @@ async function run() {
             res.json(result)
         })
 
-        // ----------------- Register New Candidate ------------
-        app.post('/registerCandidate', async (req, res) => {
-            const newCandidate = req.body;
-            const result = await candidatesCollection.insertOne(newCandidate)
-            res.json(result)
-        })
+        // ----------------- Reset Voters Status --------------
+        app.get('/resetVoters', async (req, res) => {
+            const filter = { voted: true };
+            const updateDoc = {
+                $set: { voted: false }
+            }
+            const options = { upsert: true }
+            const result = await votersCollection.updateMany(filter, updateDoc, options);
 
-        // ------------------ Voter Query by nidNumber ----------
-        app.get('/voter', async (req, res) => {
-            const { nidNumber } = req.query;
-            const query = { nidNumber: Number(nidNumber) };
-            const result = await votersCollection.findOne(query)
             res.json(result)
         })
 
@@ -194,6 +200,23 @@ async function run() {
             } else {
                 res.json(500)
             }
+        })
+
+        //OTP Verification if Face Verification Fails
+        app.post('/phoneVerification', async (req, res) => {
+            // console.log(req.body.phoneNumber)
+            const number = req.body.phoneNumber
+            const myOTP = Math.round(Math.random() * 1000000)
+
+            // Twilio Creating Message
+            await twilio.messages.create({
+                from: "+18036184523",
+                to: number,
+                body: `Your verification code is: ${myOTP}. Use this to verify your login authentication.`
+            }).then(response => {
+                res.json({ sentOtp: myOTP })
+            }).catch(err => res.json(err))
+
         })
 
     }
