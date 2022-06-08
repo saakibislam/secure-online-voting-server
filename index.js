@@ -202,11 +202,22 @@ async function run() {
             }
         })
 
+        // Calculating OTP
+        function calculateOtp() {
+            let myOTP = 0;
+            // Calculating till getting 6 digit
+            while (myOTP.toString().length !== 6) {
+                myOTP = Math.round(Math.random() * 1000000)
+            }
+            return myOTP
+        }
+
         //OTP Verification if Face Verification Fails
         app.post('/phoneVerification', async (req, res) => {
             // console.log(req.body.phoneNumber)
             const number = req.body.phoneNumber
-            const myOTP = Math.round(Math.random() * 1000000)
+            const myOTP = calculateOtp();
+            // const myOTP = Math.round(Math.random() * 1000000)
 
             // Twilio Creating Message
             await twilio.messages.create({
